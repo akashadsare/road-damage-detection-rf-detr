@@ -65,7 +65,7 @@ The model outperformed baseline approaches using SAM3 and YOLO.
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/road-damage-detection-rf-detr.git
+   git clone https://github.com/akashadsare/road-damage-detection-rf-detr.git
    cd road-damage-detection-rf-detr
    ```
 
@@ -89,10 +89,6 @@ Run the `submission.ipynb` notebook to generate predictions on the test set. The
 ## Submission
 
 The `submission/` folder contains the prediction files in the required format for the competition. Compress this folder into `submission.zip` for submission.
-
-## License
-
-[Add license if applicable]
 
 ## Acknowledgments
 
