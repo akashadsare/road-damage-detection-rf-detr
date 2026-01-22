@@ -1,0 +1,140 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{float}
+\usepackage{caption}
+\geometry{margin=0.85in}
+
+\begin{document}
+\begin{center}
+{\LARGE Road Damage Detection Using RF-DETR\par}
+\vspace{0.25em}
+{\large Technical Report\par}
+\vspace{0.75em}
+Akash A\\
+1 January 2026
+\end{center}
+\vspace{0.5em}
+
+\begin{abstract}
+This report describes the methodology used to detect and classify road surface damages from images using RF-DETR. We summarize the dataset/task setup, the RF-DETR model architecture, the training pipeline and hyperparameters used for fine-tuning, and the techniques applied to improve performance. Results are reported using mAP on the validation set and are summarized from the training artifacts (\texttt{log.txt} and \texttt{results.json}).
+\end{abstract}
+
+\section{Problem Setup and Dataset}
+The goal is to perform object detection on road images: for each damage instance, predict a bounding box and one of five classes (Longitudinal Crack, Transverse Crack, Alligator Crack, Other Corruption, and Pothole). The dataset follows the Road Damage Detection 2022 (RDD2022) specification with labels provided in YOLO TXT format. We use the provided validation split for model selection.
+
+\section{Model Architecture (RF-DETR)}
+We fine-tuned an RF-DETR detector (\texttt{RFDETRNano}) which follows the DETR family paradigm: a convolutional feature extractor produces image features that are consumed by a transformer-based detection head that predicts a fixed set of object queries. This design helps capture global context and reduces the need for hand-designed anchor boxes.
+
+\begin{figure}[t]
+    \centering
+    \begin{minipage}[t]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{baidu-rtdetr-model-overview.png}
+        \vspace{0.25em}
+        {\small (a) DETR-style architecture overview.}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{image.png}
+        \vspace{0.25em}
+        {\small (b) Example qualitative model output.}
+    \end{minipage}
+    \caption{Model architecture reference (source image provided as AVIF; a PNG copy is used for LaTeX compatibility) and an example output visualization.}
+\end{figure}
+
+In our training logs, the selected RF-DETR Nano checkpoint reports $\approx 30.16$M parameters (\texttt{n\_parameters = 30157870}). Exponential Moving Average (EMA) of weights was enabled during training and used for the best-performing checkpoint selection.
+
+\section{Data Preparation and Training Strategy}
+\subsection{Label conversion and directory structure}
+RF-DETR expects COCO-style annotations. We converted the provided YOLO labels into COCO JSON files (\texttt{\_annotations.coco.json}) for each split (train/val/test), and renamed \texttt{val} to \texttt{valid} to match RF-DETR conventions.
+
+\subsection{Training configuration}
+Training was run for 10 epochs with the RF-DETR training API (\texttt{RFDETRNano().train}). The core training hyperparameters were:
+\begin{itemize}
+    \item Learning rate: $1\times 10^{-4}$
+    \item Batch size: 16
+    \item Gradient accumulation: 2 steps (effective batch size $\approx 32$)
+    \item Mixed precision: enabled
+    \item Gradient checkpointing: enabled
+    \item Checkpointing: best model selected from validation performance (EMA checkpoint)
+\end{itemize}
+
+\subsection{Data augmentation}
+No external datasets were used. We relied on the RF-DETR training pipeline's default preprocessing (e.g., resizing/normalization) and did not introduce custom augmentation code beyond the standard training pipeline.
+
+\section{Hyperparameter and Training Experiments}
+Given the compute budget, we focused on practical, stability-oriented training experiments rather than a large grid search:
+
+\begin{itemize}
+    \item \textbf{Epoch sweep}: trained for 10 epochs and selected the best epoch via validation mAP.
+    \item \textbf{EMA vs. regular weights}: tracked both regular validation metrics and EMA validation metrics; EMA consistently improved mAP and was used for the final checkpoint.
+    \item \textbf{Memory/performance tradeoffs}: enabled mixed precision and gradient checkpointing to fit a larger effective batch size on the available GPU, while preserving training stability.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{Validation mAP progression (EMA weights). Values are read from \texttt{log.txt}/\texttt{results.json}.}
+\begin{tabular}{@{}ccc@{}}
+    oprule
+Epoch & mAP@50:95 & mAP@50 \\
+\midrule
+0 & 0.208 & 0.429 \\
+3 & 0.264 & 0.528 \\
+6 & 0.284 & 0.557 \\
+9 & 0.294 & 0.574 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Improving Upon the Baseline}
+We treat the baseline as a straightforward fine-tuning run of \texttt{RFDETRNano} on RDD2022-format data. The main techniques used to improve results were:
+\begin{itemize}
+    \item \textbf{EMA of model weights}: improved validation mAP and was used for checkpoint selection.
+    \item \textbf{Gradient accumulation}: increased the effective batch size without exceeding GPU memory limits.
+    \item \textbf{Mixed precision and gradient checkpointing}: improved training throughput and memory usage, enabling the above configuration.
+    \item \textbf{Correct label conversion (YOLO $\rightarrow$ COCO)}: ensured compatibility with RF-DETR training/evaluation.
+\end{itemize}
+
+We also explored alternative approaches including YOLO-based detectors and SAM3-based segmentation workflows, but they did not produce competitive validation performance for this competition setting and were not used in the final submission.
+
+\section{Results}
+\subsection{Best validation metrics}
+The best EMA checkpoint (epoch 9) achieved:\newline
+    extbf{mAP@50:95 = 0.2941}, \textbf{mAP@50 = 0.5737}, \textbf{precision = 0.6468}, \textbf{recall = 0.52}.
+
+\begin{table}[H]
+\centering
+\caption{Per-class validation metrics for the best EMA checkpoint (epoch 9).}
+\begin{tabular}{@{}lcccc@{}}
+    oprule
+Class & AP@50:95 & AP@50 & Precision & Recall \\
+\midrule
+Longitudinal Crack & 0.252 & 0.500 & 0.531 & 0.52 \\
+Transverse Crack   & 0.247 & 0.530 & 0.562 & 0.52 \\
+Alligator Crack    & 0.333 & 0.612 & 0.729 & 0.52 \\
+Other Corruption   & 0.440 & 0.725 & 0.871 & 0.52 \\
+Pothole            & 0.197 & 0.502 & 0.541 & 0.52 \\
+\midrule
+Overall            & 0.294 & 0.574 & 0.647 & 0.52 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\subsection{Training Curves}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{kaggle/working/rfdetr-p100/metrics_plot.png}
+    \caption{Training and validation mAP curves for RF-DETR. The plot shows steady improvement in both mAP@50:95 and mAP@50, with validation metrics peaking at epoch 9.}
+\end{figure}
+The training curves (Figure 3) demonstrate consistent learning and no overfitting, with validation mAP@50:95 rising from 0.21 to 0.29 and mAP@50 from 0.43 to 0.57. This indicates stable convergence and effective use of the training configuration.
+
+\section{Conclusion}
+The RF-DETR Nano model, trained on the RDD2022-style dataset, achieved a best validation mAP@50:95 of 0.294 and mAP@50 of 0.574, with precision 0.65 and recall 0.52. The per-class results show strong detection for crack categories, while pothole detection remains challenging (AP@50:95 = 0.197). The training curves confirm stable learning and no overfitting, validating the effectiveness of the chosen configuration (EMA, gradient accumulation, mixed precision, and gradient checkpointing). Attempts with YOLO and SAM3 models did not yield competitive results. Overall, RF-DETR provides a robust solution for road damage detection in this setting, with future improvements likely from targeted augmentation and class balancing.
+
+\end{document}

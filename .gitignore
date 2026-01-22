@@ -1,0 +1,24 @@
+# Model checkpoints
+checkpoint_best_ema.pth
+
+# Large archives
+rfdetr.zip
+submission.zip
+
+# LaTeX build files
+*.aux
+*.log
+*.out
+*.pdf
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
