@@ -17,6 +17,8 @@ Akash A
 - **Parameters**: Approximately 30.16M
 - **Training Features**: Exponential Moving Average (EMA), Mixed Precision, Gradient Checkpointing
 
+![RF-DETR Model Overview](baidu-rtdetr-model-overview.avif)
+
 ## Dataset
 
 - **Source**: Road Damage Detection 2022 (RDD2022)
@@ -45,6 +47,8 @@ Validation Metrics (EMA weights):
 | 3     | 0.264     | 0.528  |
 | 6     | 0.284     | 0.557  |
 | 9     | 0.294     | 0.574  |
+
+![Example Model Output](image.png)
 
 The model outperformed baseline approaches using SAM3 and YOLO.
 
